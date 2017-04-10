@@ -15,12 +15,19 @@ import java.awt.image.BufferedImage;
  */
 public class CellEnumerator {
 
+    private int arrayOrigin = 0;
+
     private final Dimension dim;
     private final Dimension slicer;
 
     public CellEnumerator(Dimension totalSize, CellSlicer cellSize) {
+        this(0, totalSize, cellSize);
+    }
+
+    public CellEnumerator(int arrayOrigin, Dimension totalSize, CellSlicer cellSize) {
         this.dim = totalSize;
         this.slicer = cellSize;
+        this.arrayOrigin = arrayOrigin;
     }
 
     /**
@@ -42,7 +49,7 @@ public class CellEnumerator {
 
         set.onClear((Graphics2D) img.getGraphics(), dim);
 
-        int zb_array_pos = 0;
+        int zb_array_pos = this.arrayOrigin;
         int logical_x = 0;
         int logical_y = 0;
         CellImageMutator cell = new CellImageMutator();
@@ -62,7 +69,7 @@ public class CellEnumerator {
                     cell.setCell(logical_x, logical_y); // ibid
                     cell.setImage(icell);
                     if (set.onDrawCell(cell) == false) {
-                        return false;
+                        return true; // no need to repaint
                     }
                     logical_x++;
                 }
@@ -90,7 +97,7 @@ public class CellEnumerator {
 
         CellInfo rect = new CellInfo(0, 0, dim_delta.width, dim_delta.height);
 
-        int zb_array_pos = 0;
+        int zb_array_pos = this.arrayOrigin;
         int logical_x = 0;
         int logical_y = 0;
 
@@ -159,6 +166,14 @@ public class CellEnumerator {
             return false;
         }
         return true;
+    }
+
+    public int getArrayOrigin() {
+        return arrayOrigin;
+    }
+
+    public void setArrayOrigin(int ss) {
+        this.arrayOrigin = ss;
     }
 
 }

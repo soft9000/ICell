@@ -7,6 +7,7 @@ import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Point;
 import java.awt.Toolkit;
+import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 
 /**
@@ -21,6 +22,8 @@ public class JPanCellGrid extends javax.swing.JPanel implements IGridServer {
     private IGridClient set = null;
     private CellSlicer slicer;
     private CellEnumerator zenum;
+    private int paint_retry; // avoid potential repaint loop
+    private final Point cached = new Point(-1, -1);
 
     /**
      * Creates new form JPanCellGrid
@@ -62,14 +65,22 @@ public class JPanCellGrid extends javax.swing.JPanel implements IGridServer {
 
     @Override
     public void paint(Graphics gr) {
-        if (img == null) {
-            newImage();
-        }
+        check();
         if (zenum.drawAll(img, set) == false) {
             img = null; // possibilites 
-            this.repaint();
+            if (paint_retry < 3) {
+                this.repaint();
+            }
+            paint_retry++;
         } else {
             gr.drawImage(img, 0, 0, this);
+            paint_retry = 0;
+        }
+    }
+
+    private void check() {
+        if (img == null) {
+            newImage();
         }
     }
 
@@ -77,7 +88,11 @@ public class JPanCellGrid extends javax.swing.JPanel implements IGridServer {
         if (img == null) {
             Dimension dim = Toolkit.getDefaultToolkit().getScreenSize(); // possibilites 
             img = new BufferedImage(dim.width + 1, dim.height + 1, BufferedImage.TYPE_INT_ARGB);
+        }
+        if (zenum == null) {
             zenum = new CellEnumerator(this.getSize(), slicer);
+        } else {
+            zenum = new CellEnumerator(zenum.getArrayOrigin(), this.getSize(), slicer);
         }
         Dimension dim = this.getSize();
         Graphics igr = img.getGraphics();
@@ -95,6 +110,12 @@ public class JPanCellGrid extends javax.swing.JPanel implements IGridServer {
 
         setBackground(java.awt.Color.white);
         addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mousePressed(java.awt.event.MouseEvent evt) {
+                formMousePressed(evt);
+            }
+            public void mouseReleased(java.awt.event.MouseEvent evt) {
+                formMouseReleased(evt);
+            }
             public void mouseClicked(java.awt.event.MouseEvent evt) {
                 formMouseClicked(evt);
             }
@@ -113,21 +134,19 @@ public class JPanCellGrid extends javax.swing.JPanel implements IGridServer {
     }// </editor-fold>//GEN-END:initComponents
 
     private void formMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_formMouseClicked
-        System.out.println("Click: " + evt.getPoint().toString());
-        CellImage cell = locate(evt.getPoint());
-        if (cell != null) {
-            System.out.println("Located");
-            set.onClicked(cell);
-            this.getGraphics().drawImage(img, 0, 0, this);
-        } else {
-            System.out.println("Not Located");
-        }
+        manageClick(evt);
     }//GEN-LAST:event_formMouseClicked
 
+    private void formMousePressed(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_formMousePressed
+        manageClick(evt);
+    }//GEN-LAST:event_formMousePressed
+
+    private void formMouseReleased(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_formMouseReleased
+        manageClick(evt);
+    }//GEN-LAST:event_formMouseReleased
+
     private CellImage locate(Point point) {
-        if (img == null) {
-            newImage();
-        }
+        check();
 
         CellImage info = zenum.findCell(img, point);
         if (info != null) {
@@ -141,6 +160,43 @@ public class JPanCellGrid extends javax.swing.JPanel implements IGridServer {
     @Override
     public void update(ICellShape mode) {
         // TODO: Implement tracking / mouse shape "ghosting."        
+    }
+
+    @Override
+    public int getArrayOrigin() {
+        check();
+        return this.zenum.getArrayOrigin();
+    }
+
+    @Override
+    public void setArrayOrigin(int ss) {
+        check();
+        this.zenum.setArrayOrigin(ss);
+    }
+
+    /**
+     * Resolving the dropped-mouse click problem: Monitoring several clicking
+     * events insures that at least ONE of them will be received... also
+     * de-bounces mouse clicks.
+     *
+     * @param evt
+     */
+    private void manageClick(MouseEvent evt) {
+        Point pt = evt.getPoint();
+        if (this.cached.equals(pt)) {
+            return;
+        }
+        cached.x = pt.x;
+        cached.y = pt.y;
+        System.out.println("Click: " + evt.getPoint().toString());
+        CellImage cell = locate(evt.getPoint());
+        if (cell != null) {
+            System.out.println("Located");
+            set.onClicked(cell);
+            this.getGraphics().drawImage(img, 0, 0, this);
+        } else {
+            System.out.println("Not Located");
+        }
     }
 
 
